@@ -40,34 +40,40 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Register route
+// Register route
 app.post("/api/register", async (req, res) => {
   try {
-    const { username, email, password, role } = req.body;
-    
+    const { username, email, password } = req.body;
+
     // Check if email already exists
     const existingEmail = await User.findOne({ email });
     if (existingEmail) {
       return res.status(400).json({ error: "A user with this email already exists" });
     }
-    
+
     // Check if username already exists
     const existingUsername = await User.findOne({ username });
     if (existingUsername) {
       return res.status(400).json({ error: "Username already taken" });
     }
-    
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({
       username,
       email,
       password_hash: hashedPassword,
-      role: role || 'Staff',
       created_at: new Date(),
       last_login: null
     });
     await user.save();
-    const token = jwt.sign({ userId: user.user_id, role: user.role }, "JWT_SECRET", { expiresIn: "1d" });
-    res.json({ success: true, token, role: user.role });
+
+    const token = jwt.sign(
+      { userId: user.user_id, username: user.username, email: user.email },
+      "JWT_SECRET",
+      { expiresIn: "1d" }
+    );
+
+    res.json({ success: true, token });
   } catch (error) {
     // Handle MongoDB duplicate key error explicitly
     if (error.code === 11000) {
@@ -85,7 +91,7 @@ app.post("/api/register", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { username, email, password } = req.body;
-    
+
     // Allow login with either username or email
     let user;
     if (email) {
@@ -95,26 +101,24 @@ app.post("/api/login", async (req, res) => {
     } else {
       return res.status(400).json({ error: "Please provide either username or email" });
     }
-    
+
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
-    
+
     // Update last login
     user.last_login = new Date();
     await user.save();
-    
-    const token = jwt.sign({ 
-      userId: user.user_id, 
-      role: user.role,
-      username: user.username,
-      email: user.email
-    }, "JWT_SECRET", { expiresIn: "1d" });
-    
-    res.json({ 
-      success: true, 
-      token, 
-      role: user.role,
+
+    const token = jwt.sign(
+      { userId: user.user_id, username: user.username, email: user.email },
+      "JWT_SECRET",
+      { expiresIn: "1d" }
+    );
+
+    res.json({
+      success: true,
+      token,
       userId: user.user_id,
       username: user.username,
       email: user.email
@@ -131,12 +135,11 @@ app.get("/api/user/profile", authenticateToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    
+
     res.json({
       userId: user.user_id,
       username: user.username,
       email: user.email,
-      role: user.role,
       created_at: user.created_at,
       last_login: user.last_login
     });
@@ -144,6 +147,7 @@ app.get("/api/user/profile", authenticateToken, async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
+
 
 app.get("/api/protected", (req, res) => {
   try {

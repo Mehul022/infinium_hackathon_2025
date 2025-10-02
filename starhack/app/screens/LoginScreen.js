@@ -47,7 +47,7 @@ export default function LoginScreen({ navigation }) {
         requestBody.username = emailOrUsername.value;
       }
       
-      const response = await fetch("http://10.42.0.1:3000/api/login", {
+      const response = await fetch("http://10.231.48.49:3000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),

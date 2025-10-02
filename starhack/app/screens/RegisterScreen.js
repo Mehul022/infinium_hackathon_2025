@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { View, StyleSheet, TouchableOpacity, Alert } from "react-native";
-import { Text, SegmentedButtons } from "react-native-paper";
+import { Text } from "react-native-paper";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import Background from "../components/Background";
@@ -18,7 +18,6 @@ export default function RegisterScreen({ navigation }) {
   const [username, setUsername] = useState({ value: "", error: "" });
   const [email, setEmail] = useState({ value: "", error: "" });
   const [password, setPassword] = useState({ value: "", error: "" });
-  const [role, setRole] = useState("Staff");
   const [loading, setLoading] = useState(false);
 
   const onSignUpPressed = async () => {
@@ -33,24 +32,23 @@ export default function RegisterScreen({ navigation }) {
       console.log("Validation errors:", { usernameError, emailError, passwordError });
       return;
     }
-    
+
     try {
       setLoading(true);
       console.log("Sending registration request");
-      const response = await fetch("http://10.42.0.1:3000/api/register", {
+      const response = await fetch("http://10.231.48.49:3000/api/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: username.value,
           email: email.value,
           password: password.value,
-          role: role,
         }),
       });
-      
+
       const data = await response.json();
       console.log("Response received:", data);
-      
+
       if (response.status !== 200) {
         if (data.error && data.error.includes("email already exists")) {
           Alert.alert("Registration Error", "A user with this email already exists");
@@ -63,10 +61,9 @@ export default function RegisterScreen({ navigation }) {
         }
         return;
       }
-      
+
       if (data.success && data.token) {
         await AsyncStorage.setItem("token", data.token);
-        await AsyncStorage.setItem("userRole", data.role);
         navigation.reset({
           index: 0,
           routes: [{ name: "PatientListScreen" }],
@@ -114,17 +111,6 @@ export default function RegisterScreen({ navigation }) {
         errorText={password.error}
         secureTextEntry
       />
-      <Text style={styles.roleLabel}>Select Role:</Text>
-      <SegmentedButtons
-        value={role}
-        onValueChange={setRole}
-        buttons={[
-          { value: "doctor", label: "Doctor" },
-          { value: "Manager", label: "Manager" },
-          { value: "Staff", label: "Staff" },
-        ]}
-        style={styles.roleSelector}
-      />
       <Button
         mode="contained"
         onPress={onSignUpPressed}
@@ -152,13 +138,5 @@ const styles = StyleSheet.create({
   link: {
     fontWeight: "bold",
     color: theme.colors.primary,
-  },
-  roleLabel: {
-    alignSelf: 'flex-start',
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  roleSelector: {
-    marginBottom: 10,
   },
 });

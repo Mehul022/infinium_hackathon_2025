@@ -12,7 +12,7 @@ export default function StartScreen({ navigation }) {
       <Logo />
       <Header>Starhack App</Header>
       <Paragraph>
-        Quick Anemia Check - Get Your Results Instantly, No Doctor Visit Needed!
+        Turn Health into a Game – Unlock Rewards Every Day.
       </Paragraph>
       <Button
         mode="contained"
