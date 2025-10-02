@@ -194,6 +194,31 @@ app.get("/api/user/fullProfile", authenticateToken, async (req, res) => {
   }
 });
 
+app.get("/api/user/details", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Fetch user from database
+    const user = await User.findOne({ user_id: userId });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Prepare response
+    const userDetails = {
+      username: user.username || "User",
+      phone: user.phone || "N/A",
+      email: user.email || "N/A",
+      created_at: user.createdAt || new Date().toISOString(),
+      last_login: user.lastLogin || new Date().toISOString(),
+    };
+
+    console.log("User Details Response:", userDetails);
+    res.json(userDetails);
+  } catch (err) {
+    console.error("Error in /api/user/details:", err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 app.get("/api/user/progress", authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
