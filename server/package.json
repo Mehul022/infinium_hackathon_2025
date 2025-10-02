@@ -1,0 +1,32 @@
+{
+    "name": "anemia-screening-backend",
+    "version": "1.0.0",
+    "description": "Backend for Anemia Screening Application",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "dev": "nodemon index.js"
+    },
+    "dependencies": {
+        "bcrypt": "^5.1.1",
+        "cors": "^2.8.5",
+        "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.2",
+        "mongoose": "^8.1.1",
+        "onnxruntime-node": "^1.16.3",
+        "sharp": "^0.33.2"
+    },
+    "devDependencies": {
+        "nodemon": "^3.0.3"
+    },
+    "keywords": [
+        "anemia",
+        "screening",
+        "medical",
+        "nodejs",
+        "express",
+        "mongodb"
+    ],
+    "author": "Your Name",
+    "license": "ISC"
+}
