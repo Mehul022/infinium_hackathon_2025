@@ -12,6 +12,10 @@ const sharp = require("sharp"); // For image processing
 
 // Import models
 const User = require("./models/User");
+const UserRewards = require("./models/userRewards");
+const DailyProgress = require("./models/dailyProgress");
+const MonthlyProgress = require("./models/monthlyProgress");
+const Insurance = require("./models/insurance");
 
 const app = express();
 app.use(cors());
@@ -39,8 +43,28 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
-// Register route
-// Register route
+app.get("/api/user/fullProfile", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    const user = await User.findOne({ user_id: userId });
+    const rewards = await UserRewards.findOne({ user_id: userId });
+    const daily = await DailyProgress.findOne({ user_id: userId }).sort({ date: -1 });
+    const monthly = await MonthlyProgress.findOne({ user_id: userId }).sort({ month: -1 });
+    const insurance = await Insurance.find({ user_id: userId });
+
+    res.json({
+      user,
+      rewards,
+      daily,
+      monthly,
+      insurance
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.post("/api/register", async (req, res) => {
   try {
     const { username, email, password } = req.body;

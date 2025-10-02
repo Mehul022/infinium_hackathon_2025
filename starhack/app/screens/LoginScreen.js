@@ -64,7 +64,7 @@ export default function LoginScreen({ navigation }) {
         await AsyncStorage.setItem("token", data.token);
         navigation.reset({
           index: 0,
-          routes: [{ name: "PatientListScreen" }],
+          routes: [{ name: "FirstPage" }],
         });
       }
     } catch (error) {

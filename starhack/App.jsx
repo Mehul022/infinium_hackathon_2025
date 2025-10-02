@@ -11,7 +11,11 @@ import {
   ResetPasswordScreen,
   HomeScreen,
 } from "./app/screens";
-
+import ProfileScreen from "./app/screens/profilePage";
+import DailyTasksScreen from "./app/screens/DailyTasksScreen";
+import MonthlyProgressScreen from "./app/screens/MonthlyProgressScreen";
+import InsuranceScreen from "./app/screens/InsuranceScreen";
+import FirstPage from "./app/screens/firstPage";
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -32,6 +36,11 @@ export default function App() {
             name="ResetPasswordScreen"
             component={ResetPasswordScreen}
           />
+          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
+          <Stack.Screen name="DailyTasksScreen" component={DailyTasksScreen} />
+          <Stack.Screen name="MonthlyProgressScreen" component={MonthlyProgressScreen}/>
+          <Stack.Screen name="InsuranceScreen" component={InsuranceScreen} />
+          <Stack.Screen name="FirstPage" component={FirstPage} />
         </Stack.Navigator>
       </NavigationContainer>
     </Provider>
