@@ -12,16 +12,13 @@ const sharp = require("sharp"); // For image processing
 
 // Import models
 const User = require("./models/User");
-const Patient = require("./models/Patient");
-const HistoricalData = require("./models/HistoricalData");
-const Screening = require("./models/Screening");
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
 // MongoDB connection
-mongoose.connect("mongodb+srv://Mehul:Mehul293645@anemia.1mntp.mongodb.net/?retryWrites=true&w=majority&appName=Anemia")
+mongoose.connect("mongodb+srv://mehulag022_db_user:ejW49KI6Tg5Of9G9@infiniumhack2025.j1lc9uo.mongodb.net/?retryWrites=true&w=majority&appName=infiniumhack2025")
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
 

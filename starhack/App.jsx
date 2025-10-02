@@ -11,14 +11,7 @@ import {
   ResetPasswordScreen,
   HomeScreen,
 } from "./app/screens";
-import UploadScreen from "./app/screens/UploadScreen";
-import DisplayImageScreen from "./app/screens/DisplayImageScreen";
-import ResultsScreen from "./app/screens/ResultsScreen";
-import PatientListScreen from "./app/screens/PatientListScreen";
-import AddPatientScreen from "./app/screens/AddPatientScreen";
-import ProfileScreen from "./app/screens/ProfileScreen";
-import PatientDetailScreen from "./app/screens/PatientDetailScreen";
-import LiveCameraScreen from "./app/screens/LiveCameraScreen";
+
 const Stack = createStackNavigator();
 
 export default function App() {
@@ -39,14 +32,6 @@ export default function App() {
             name="ResetPasswordScreen"
             component={ResetPasswordScreen}
           />
-          <Stack.Screen name="PatientListScreen" component={PatientListScreen} />
-          <Stack.Screen name="AddPatientScreen" component={AddPatientScreen} />
-          <Stack.Screen name="ProfileScreen" component={ProfileScreen} />
-          <Stack.Screen name="UploadScreen" component={UploadScreen} />
-          <Stack.Screen name="ResultsScreen" component={ResultsScreen} />
-          <Stack.Screen name="DisplayImageScreen" component={DisplayImageScreen} />
-          <Stack.Screen name="PatientDetailScreen" component={PatientDetailScreen} />
-          <Stack.Screen name="LiveCameraScreen" component={LiveCameraScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </Provider>

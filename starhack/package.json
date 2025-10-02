@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "type": "module",
+  "type": "commonjs",
   "dependencies": {
     "@expo/metro-runtime": "~3.2.3",
     "@hookform/resolvers": "^3.9.0",
