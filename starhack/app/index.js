@@ -6,6 +6,7 @@ import DailyTasksScreen from "./screens/DailyTasksScreen";
 import MonthlyProgressScreen from "./screens/MonthlyProgressScreen";
 import InsuranceScreen from "./screens/InsuranceScreen";
 import FirstPage from "./screens/firstPage";
+
 const Stack = createStackNavigator();
 
 const App = () => {

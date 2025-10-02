@@ -11,7 +11,7 @@ import onnx from "onnxruntime-node";
 import sharp from "sharp"; // For image processing
 import cron from "node-cron";
 import { GoogleGenAI } from "@google/genai";
-
+import insuranceRoute from "./routes/insurance.js";
 // Import models
 import User from "./models/User.js";
 import UserRewards from "./models/userRewards.js";
@@ -33,7 +33,7 @@ mongoose
   )
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB connection error:", err));
-
+app.use("/api/insurance", insuranceRoute);
 // ------------------- CRON for Daily Tasks -------------------
 cron.schedule("0 0 * * *", async () => {
   try {
@@ -154,8 +154,6 @@ cron.schedule("0 0 * * *", async () => {
   }
 });
 
-
-// Middleware to authenticate token
 const authenticateToken = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -171,6 +169,128 @@ const authenticateToken = (req, res, next) => {
     return res.status(403).json({ error: "Invalid token" });
   }
 };
+app.get("/api/daily-progress", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Get today's date at midnight
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Find today's progress for the user
+    let dailyProgress = await DailyProgress.findOne({
+      user_id: userId,
+      date: { $gte: today }
+    });
+
+    // If no progress exists for today, create a default one
+    if (!dailyProgress) {
+      dailyProgress = new DailyProgress({
+        user_id: userId,
+        tasks: [
+          {
+            name: "Morning Exercise",
+            description: "Complete 30 minutes of morning workout",
+            completed: false,
+            isHeartTask: false,
+            percentage: 0
+          },
+          {
+            name: "Hydration Goal",
+            description: "Drink 8 glasses of water throughout the day",
+            completed: false,
+            isHeartTask: true,
+            percentage: 0
+          },
+          {
+            name: "Step Count",
+            description: "Reach 10,000 steps today",
+            completed: false,
+            isHeartTask: false,
+            percentage: 0
+          },
+          {
+            name: "Healthy Meals",
+            description: "Log 3 healthy meals with balanced nutrition",
+            completed: false,
+            isHeartTask: false,
+            percentage: 0
+          },
+          {
+            name: "Mindfulness",
+            description: "Practice 10 minutes of meditation or breathing exercises",
+            completed: false,
+            isHeartTask: false,
+            percentage: 0
+          }
+        ],
+        steps: 0,
+        moveMinutes: 0,
+        briskWalkMinutes: 0,
+        lightJogMinutes: 0,
+        date: new Date()
+      });
+
+      await dailyProgress.save();
+    }
+
+    res.json({
+      success: true,
+      tasks: dailyProgress.tasks,
+      steps: dailyProgress.steps,
+      moveMinutes: dailyProgress.moveMinutes,
+      briskWalkMinutes: dailyProgress.briskWalkMinutes,
+      lightJogMinutes: dailyProgress.lightJogMinutes,
+      date: dailyProgress.date
+    });
+
+  } catch (error) {
+    console.error("Error fetching daily progress:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Optional: PUT endpoint to update task progress
+app.put("/api/daily-progress/task/:taskIndex", authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const taskIndex = parseInt(req.params.taskIndex);
+    const { percentage } = req.body;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const dailyProgress = await DailyProgress.findOne({
+      user_id: userId,
+      date: { $gte: today }
+    });
+
+    if (!dailyProgress) {
+      return res.status(404).json({ error: "Daily progress not found" });
+    }
+
+    if (taskIndex < 0 || taskIndex >= dailyProgress.tasks.length) {
+      return res.status(400).json({ error: "Invalid task index" });
+    }
+
+    // Update the task percentage
+    dailyProgress.tasks[taskIndex].percentage = Math.min(percentage, 100);
+
+    await dailyProgress.save();
+
+    res.json({
+      success: true,
+      task: dailyProgress.tasks[taskIndex]
+    });
+
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+// Middleware to authenticate token
 
 app.get("/api/user/fullProfile", authenticateToken, async (req, res) => {
   try {
