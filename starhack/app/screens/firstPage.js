@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,83 +7,118 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import FitnessInfoPopup from '../components/FitnessInfoPopup';
 
 const { width, height } = Dimensions.get('window');
 
-const FirstPage = () => {
+const FirstPage = ({ navigation }) => {
   const [selectedTab, setSelectedTab] = useState('Steps');
-  const [showInfoPopup, setShowInfoPopup] = useState(true); // Show popup by default
+  const [showInfoPopup, setShowInfoPopup] = useState(true);
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Random values for demo
-  const healthData = {
-    steps: 1580,
-    stepsGoal: 10000,
-    heartPts: 15,
-    heartPtsGoal: 30,
-    rewardPoints: 25,
-    calories: 938,
-    distance: 1.12,
-    moveMinutes: 23,
-    dailyGoalsAchieved: 0,
-    dailyGoalsTotal: 7,
-    weeklyTarget: 66,
-    weeklyTotal: 150,
-    activityMinutes: 23, // minutes of heart-pumping activity
-  };
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          navigation.reset({ index: 0, routes: [{ name: 'LoginScreen' }] });
+          return;
+        }
 
-  const weeklyProgress = [
-    { day: 'F', completed: false },
-    { day: 'S', completed: false },
-    { day: 'S', completed: false },
-    { day: 'M', completed: true },
-    { day: 'T', completed: true },
-    { day: 'W', completed: true },
-    { day: 'T', completed: true },
-  ];
+        const response = await fetch('http://10.231.48.49:3000/api/user/progress', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const text = await response.text();
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          console.error('Invalid JSON from server:', text);
+          Alert.alert('Error', 'Server returned invalid response');
+          setLoading(false);
+          return;
+        }
+
+        if (!response.ok) {
+          Alert.alert('Error', data.error || 'Failed to fetch progress data');
+          setLoading(false);
+          return;
+        }
+
+        setUserData(data);
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Error', 'Could not fetch data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading || !userData) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
+  const { username, dailyProgress, weeklyProgress, rewardPoints } = userData;
+
+  const totalSteps = dailyProgress.steps || 0;
+  const calories = dailyProgress.calories || Math.round(totalSteps * 0.04);
+  const distance = dailyProgress.distance || +(totalSteps * 0.0008).toFixed(2);
+  const stepsGoal = dailyProgress.tasks.find(t => t.name === 'task1')?.goal || 10000;
 
   const CircularProgress = ({ value, maxValue, size = 200 }) => {
-    const progress = (value / maxValue) * 100;
-    
+    const progress = Math.min((value / maxValue) * 100, 100);
+    const circumference = 2 * Math.PI * ((size - 20) / 2);
+    const strokeDashoffset = circumference - (progress / 100) * circumference;
+
     return (
       <View style={[styles.circularContainer, { width: size, height: size }]}>
-        {/* Background circle */}
-        <View style={[
-          styles.circleBackground, 
-          { 
-            width: size - 20, 
-            height: size - 20, 
-            borderRadius: (size - 20) / 2,
-          }
-        ]} />
-        
-        {/* Progress circle - simplified version */}
-        <View style={[
-          styles.circleProgress, 
-          { 
-            width: size - 20, 
-            height: size - 20, 
-            borderRadius: (size - 20) / 2,
-            transform: [{ rotate: `${(progress * 3.6) - 90}deg` }]
-          }
-        ]} />
-        
+        <View style={[styles.circleBackground, {
+          width: size - 20,
+          height: size - 20,
+          borderRadius: (size - 20) / 2,
+          borderWidth: 8,
+          borderColor: '#EEE'
+        }]} />
+        <View style={[styles.circleProgress, {
+          width: size - 20,
+          height: size - 20,
+          borderRadius: (size - 20) / 2,
+          borderWidth: 8,
+          borderColor: '#00BFA5',
+          borderLeftColor: progress > 25 ? '#00BFA5' : 'transparent',
+          borderTopColor: progress > 0 ? '#00BFA5' : 'transparent',
+          borderRightColor: progress > 50 ? '#00BFA5' : 'transparent',
+          borderBottomColor: progress > 75 ? '#00BFA5' : 'transparent',
+          transform: [{ rotate: '-90deg' }]
+        }]} />
         <View style={styles.circularContent}>
           <Text style={styles.mainValue}>
-            {selectedTab === 'Steps' ? healthData.steps.toLocaleString() : healthData.heartPts}
+            {selectedTab === 'Steps' ? totalSteps.toLocaleString() : dailyProgress.heartPts}
           </Text>
           {selectedTab === 'Steps' ? (
             <View style={styles.rewardSection}>
-              <Text style={styles.goalText}>of {healthData.stepsGoal.toLocaleString()}</Text>
-              <Text style={styles.rewardText}>🏆 {healthData.rewardPoints} points earned</Text>
+              <Text style={styles.goalText}>of {stepsGoal.toLocaleString()}</Text>
+              <Text style={styles.rewardText}>🏆 {rewardPoints} points earned</Text>
+              <Text style={styles.goalText}>{calories} cal • {distance} km</Text>
             </View>
           ) : (
             <View style={styles.rewardSection}>
-              <Text style={styles.goalText}>of {healthData.heartPtsGoal} goal</Text>
-              <Text style={styles.heartPtsInfo}>{healthData.activityMinutes} mins activity</Text>
-              <Text style={styles.intensityText}>💪 Increase intensity for more</Text>
+              <Text style={styles.goalText}>of {dailyProgress.heartPtsGoal} goal</Text>
+              <Text style={styles.heartPtsInfo}>Last 30 days activity</Text>
+              <Text style={styles.intensityText}>💪 Complete tasks daily</Text>
             </View>
           )}
         </View>
@@ -94,41 +129,30 @@ const FirstPage = () => {
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#F5F5F5" barStyle="dark-content" />
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={{ paddingBottom: 150 }}>
 
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={{ paddingBottom: 150 }}
-        showsVerticalScrollIndicator={true}
-        alwaysBounceVertical={true}
-        bounces={true}
-        scrollEventThrottle={16}
-        nestedScrollEnabled={true}
-      >
-        {/* Info and Profile Icons */}
+        {/* Info & Avatar */}
         <View style={styles.topIcons}>
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={() => setShowInfoPopup(true)}
-          >
+          <TouchableOpacity style={styles.iconButton} onPress={() => setShowInfoPopup(true)}>
             <Ionicons name="information-circle-outline" size={24} color="#666" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.profileButton}>
-            <Text style={styles.profileText}>a</Text>
+          <TouchableOpacity style={styles.profileButton} onPress={() => navigation.navigate('ProfileScreen')}>
+            <Text style={styles.profileText}>{username.split(' ')[0][0]}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Main Circular Progress */}
+        {/* Circular Progress */}
         <View style={styles.mainSection}>
-          <CircularProgress 
-            value={selectedTab === 'Steps' ? healthData.steps : healthData.heartPts} 
-            maxValue={selectedTab === 'Steps' ? healthData.stepsGoal : healthData.heartPtsGoal} 
+          <CircularProgress
+            value={selectedTab === 'Steps' ? totalSteps : dailyProgress.heartPts}
+            maxValue={selectedTab === 'Steps' ? stepsGoal : dailyProgress.heartPtsGoal}
             size={250}
           />
         </View>
 
         {/* Toggle Buttons */}
         <View style={styles.toggleContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.toggleButton, selectedTab === 'Heart Pts' && styles.activeToggle]}
             onPress={() => setSelectedTab('Heart Pts')}
           >
@@ -137,8 +161,7 @@ const FirstPage = () => {
               Heart Pts
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.toggleButton, selectedTab === 'Steps' && styles.activeToggle]}
             onPress={() => setSelectedTab('Steps')}
           >
@@ -149,449 +172,123 @@ const FirstPage = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Activity Breakdown - only show when Heart Pts selected */}
-        {selectedTab === 'Heart Pts' && (
-          <View style={styles.activityBreakdown}>
-            <Text style={styles.activityTitle}>How you earned Heart Points:</Text>
-            <View style={styles.activityItem}>
-              <Text style={styles.activityType}>🚶 Brisk walk</Text>
-              <Text style={styles.activityDetails}>15 mins → 8 points</Text>
-            </View>
-            <View style={styles.activityItem}>
-              <Text style={styles.activityType}>🏃 Light jog</Text>
-              <Text style={styles.activityDetails}>8 mins → 7 points</Text>
-            </View>
-            <Text style={styles.tipText}>💡 Tip: Higher intensity = more points per minute!</Text>
-          </View>
-        )}
-
-        {/* Stats Row */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{healthData.calories}</Text>
-            <Text style={styles.statLabel}>Cal</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{healthData.distance}</Text>
-            <Text style={styles.statLabel}>km</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{healthData.moveMinutes}</Text>
-            <Text style={styles.statLabel}>Move Min</Text>
-          </View>
-        </View>
-
-        {/* Daily Goals Section */}
+        {/* Last 7 days progress */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your daily goals</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
+            <Text style={styles.sectionTitle}>Last 7 Days Progress</Text>
           </View>
-          <Text style={styles.sectionSubtitle}>Last 7 days</Text>
-          
-          <View style={styles.dailyGoals}>
-            <View style={styles.goalsLeft}>
-              <Text style={styles.goalsValue}>
-                4/{healthData.dailyGoalsTotal}
-              </Text>
-              <Text style={styles.goalsLabel}>Achieved</Text>
-            </View>
-            <View style={styles.weeklyIndicators}>
-              {weeklyProgress.map((day, index) => (
-                <View key={index} style={styles.dayContainer}>
-                  <View style={[
-                    styles.dayIndicator, 
-                    day.completed && styles.dayCompleted
-                  ]} />
+          <View style={styles.weeklyIndicators}>
+            {weeklyProgress.map((day, idx) => {
+              const completed = day.completedTasks || 0;
+              const opacity = Math.min(completed / 5, 1); // Max 5 tasks, full opacity
+              const bgColor = completed > 0
+                ? `rgba(0, 191, 165, ${0.2 + (opacity * 0.8)})`
+                : '#EEE';
+
+              return (
+                <View key={idx} style={styles.dayContainer}>
+                  <View style={[styles.dayIndicator, { backgroundColor: bgColor }]}>
+                    <Text style={styles.taskCount}>{completed}</Text>
+                  </View>
                   <Text style={styles.dayLabel}>{day.day}</Text>
                 </View>
-              ))}
-            </View>
+              );
+            })}
           </View>
+          <Text style={styles.progressHint}>Tasks completed per day</Text>
         </View>
 
-        {/* Weekly Target Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your weekly target</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </View>
-          <Text style={styles.sectionSubtitle}>29 Sept - 5 Oct</Text>
-          
-          <View style={styles.weeklyTarget}>
-            <Text style={styles.weeklyValue}>
-              <Text style={styles.weeklyAchieved}>{healthData.weeklyTarget}</Text>
-              <Text style={styles.weeklyTotal}> of {healthData.weeklyTotal}</Text>
-            </Text>
-            <View style={styles.progressBar}>
-              <View 
-                style={[
-                  styles.progressFill, 
-                  { width: `${(healthData.weeklyTarget / healthData.weeklyTotal) * 100}%` }
-                ]} 
-              />
-            </View>
-          </View>
-          
-          <TouchableOpacity style={styles.addButton}>
-            <Ionicons name="add" size={24} color="#666" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom space for proper scrolling */}
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="home" size={24} color="#2196F3" />
           <Text style={[styles.navLabel, styles.activeNavLabel]}>Home</Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('DailyTasksScreen')}>
           <Ionicons name="clipboard-outline" size={24} color="#666" />
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('InsuranceScreen')}>
           <Ionicons name="list" size={24} color="#666" />
         </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('ProfileScreen')}>
           <Ionicons name="person-outline" size={24} color="#666" />
         </TouchableOpacity>
       </View>
 
-      {/* Android Navigation */}
-      <View style={styles.androidNav}>
-        <TouchableOpacity>
-          <Ionicons name="menu" size={24} color="#666" />
-        </TouchableOpacity>
-        <TouchableOpacity>
-          <Ionicons name="square-outline" size={24} color="#666" />
-        </TouchableOpacity>
-        <TouchableOpacity>
-          <Ionicons name="chevron-back" size={24} color="#666" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Fitness Info Popup */}
-      <FitnessInfoPopup 
-        visible={showInfoPopup}
-        onClose={() => setShowInfoPopup(false)}
-      />
+      <FitnessInfoPopup visible={showInfoPopup} onClose={() => setShowInfoPopup(false)} />
     </View>
   );
 };
 
+export default FirstPage;
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  scrollContainer: {
-    flex: 1,
-    paddingHorizontal: 15,
-  },
-  topIcons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 30,
-    marginBottom: 20,
-  },
-  iconButton: {
-    padding: 8,
-  },
-  profileButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2196F3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  mainSection: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  circularContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  circleBackground: {
-    position: 'absolute',
-    borderWidth: 8,
-    borderColor: '#E5E5E5',
-    backgroundColor: 'transparent',
-  },
-  circleProgress: {
-    position: 'absolute',
-    borderWidth: 8,
-    borderColor: 'transparent',
-    borderTopColor: '#00BFA5',
-    backgroundColor: 'transparent',
-  },
-  circularContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  mainValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  rewardSection: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  goalText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
-  },
-  rewardText: {
-    fontSize: 14,
-    color: '#FF9800',
-    fontWeight: '600',
-  },
-  heartPtsInfo: {
-    fontSize: 14,
-    color: '#2196F3',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  intensityText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  activityBreakdown: {
-    backgroundColor: '#F8F9FF',
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 0,
-    marginBottom: 20,
-  },
-  activityTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  activityType: {
-    fontSize: 14,
-    color: '#555',
-  },
-  activityDetails: {
-    fontSize: 14,
-    color: '#2196F3',
-    fontWeight: '500',
-  },
-  tipText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontStyle: 'italic',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  heartPtsInfo: {
-    fontSize: 14,
-    color: '#2196F3',
-    fontWeight: '500',
-    marginBottom: 2,
-  },
-  intensityText: {
-    fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 40,
-    marginVertical: 20,
-  },
-  toggleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  activeToggle: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 20,
-  },
-  toggleText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  activeToggleText: {
-    color: '#00BFA5',
-    fontWeight: '500',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 30,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  section: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20, // Increased margin to ensure spacing
-    position: 'relative',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 16,
-  },
-  dailyGoals: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start', // Changed to flex-start to avoid text cutoff
-    paddingBottom: 10, // Added bottom padding
-  },
-  goalsLeft: {
-    flex: 1,
-  },
-  goalsValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  goalsLabel: {
-    fontSize: 16, // Increased font size
-    color: '#333', // Darker color for better visibility
-    marginTop: 6, // Increased margin
-    fontWeight: '500', // Added weight for better visibility
-  },
-  weeklyIndicators: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  dayContainer: {
-    alignItems: 'center',
-    gap: 4,
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  scrollContainer: { paddingHorizontal: 20 },
+  topIcons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 },
+  iconButton: { padding: 8, borderRadius: 8, backgroundColor: '#EEE' },
+  profileButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#2196F3', justifyContent: 'center', alignItems: 'center' },
+  profileText: { color: '#FFF', fontWeight: 'bold' },
+  mainSection: { alignItems: 'center', marginVertical: 20 },
+  circularContainer: { justifyContent: 'center', alignItems: 'center' },
+  circleBackground: { position: 'absolute' },
+  circleProgress: { position: 'absolute' },
+  circularContent: { justifyContent: 'center', alignItems: 'center' },
+  mainValue: { fontSize: 32, fontWeight: 'bold', color: '#333' },
+  rewardSection: { marginTop: 8, alignItems: 'center' },
+  goalText: { fontSize: 14, color: '#666', marginTop: 4 },
+  rewardText: { fontSize: 13, color: '#FFB300', marginTop: 4, fontWeight: '600' },
+  heartPtsInfo: { fontSize: 12, color: '#666', marginTop: 4 },
+  intensityText: { fontSize: 12, color: '#FF5252', marginTop: 4 },
+  toggleContainer: { flexDirection: 'row', justifyContent: 'center', marginVertical: 15 },
+  toggleButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#EEE', marginHorizontal: 5 },
+  activeToggle: { backgroundColor: '#E0F7F4' },
+  toggleText: { marginLeft: 6, fontSize: 14, color: '#666' },
+  activeToggleText: { color: '#00BFA5', fontWeight: 'bold' },
+  section: { marginTop: 20 },
+  sectionHeader: { marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#333' },
+  weeklyIndicators: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  dayContainer: { alignItems: 'center', flex: 1 },
   dayIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E5E5',
-    borderWidth: 2,
-    borderColor: '#E5E5E5',
-  },
-  dayCompleted: {
-    backgroundColor: '#00BFA5',
-    borderColor: '#00BFA5',
-  },
-  dayLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  weeklyTarget: {
-    marginBottom: 16,
-  },
-  weeklyValue: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  weeklyAchieved: {
-    fontWeight: 'bold',
-    color: '#00BFA5',
-  },
-  weeklyTotal: {
-    color: '#666',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E5E5',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#00BFA5',
-    borderRadius: 4,
-  },
-  addButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F5F5F5',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#EEE',
+    marginBottom: 6,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#00BFA5'
+  },
+  taskCount: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  dayLabel: { fontSize: 11, color: '#666', fontWeight: '500' },
+  progressHint: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic'
   },
   bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    backgroundColor: 'white',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
     justifyContent: 'space-around',
+    paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#E5E5E5',
+    borderColor: '#DDD',
+    backgroundColor: '#FFF'
   },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  activeNavLabel: {
-    color: '#2196F3',
-  },
-  androidNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#000',
-    paddingVertical: 8,
-  },
+  navItem: { alignItems: 'center' },
+  navLabel: { fontSize: 12, color: '#666', marginTop: 2 },
+  activeNavLabel: { color: '#2196F3', fontWeight: 'bold' },
 });
-
-export default FirstPage;

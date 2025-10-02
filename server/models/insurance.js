@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 const InsuranceSchema = new mongoose.Schema({
     user_id: String,
     provider: String,
@@ -7,4 +7,4 @@ const InsuranceSchema = new mongoose.Schema({
     endDate: Date,
     active: Boolean
 });
-module.exports = mongoose.model("Insurance", InsuranceSchema);
+export default mongoose.model("Insurance", InsuranceSchema);

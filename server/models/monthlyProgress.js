@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 const MonthlyProgressSchema = new mongoose.Schema({
     user_id: String,
     month: String, // "2025-10"
@@ -10,4 +10,4 @@ const MonthlyProgressSchema = new mongoose.Schema({
         }
     ]
 });
-module.exports = mongoose.model("MonthlyProgress", MonthlyProgressSchema);
+export default mongoose.model("MonthlyProgress", MonthlyProgressSchema);
