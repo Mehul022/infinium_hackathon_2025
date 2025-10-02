@@ -24,7 +24,7 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
 // Gemini client
-const ai = new GoogleGenAI({ apiKey: "AIzaSyCu3bC_nNHZSSq3zeIFm_IsDz2xFdl7Ywc" });
+const ai = new GoogleGenAI({ apiKey: "AIzaSyBE1ascpA1MTFpurd3eb6yO_RbDEYjgtuk" });
 
 // MongoDB connection
 mongoose

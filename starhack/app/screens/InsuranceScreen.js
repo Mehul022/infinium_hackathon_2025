@@ -14,11 +14,122 @@ import {
     Button,
     Divider,
     Chip,
-    ProgressBar,
     Badge
 } from "react-native-paper";
 import { MaterialIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Fallback insurance plans (same as backend)
+const FALLBACK_INSURANCE_PLANS = [
+    {
+        planName: "Health Shield Pro",
+        provider: "HDFC ERGO",
+        coverageType: "Health",
+        premiumAmount: 12000,
+        coverageAmount: 500000,
+        features: ["Cashless treatment at 10,000+ hospitals", "Pre-existing diseases covered after 2 years", "Annual health checkup included", "Maternity benefits available"],
+        ageGroup: "25-60 years",
+        originalPrice: 12000,
+        discount: 0,
+        finalPrice: 12000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    },
+    {
+        planName: "Life Secure Plus",
+        provider: "LIC India",
+        coverageType: "Life",
+        premiumAmount: 25000,
+        coverageAmount: 2000000,
+        features: ["Term insurance coverage", "Accidental death benefit", "Tax benefits under 80C", "Flexible premium payment options"],
+        ageGroup: "21-65 years",
+        originalPrice: 25000,
+        discount: 0,
+        finalPrice: 25000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    },
+    {
+        planName: "Auto Care Complete",
+        provider: "Bajaj Allianz",
+        coverageType: "Auto",
+        premiumAmount: 8000,
+        coverageAmount: 300000,
+        features: ["Comprehensive coverage", "Zero depreciation benefit", "24/7 roadside assistance", "Engine protection cover"],
+        ageGroup: "18+ years",
+        originalPrice: 8000,
+        discount: 0,
+        finalPrice: 8000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    },
+    {
+        planName: "Home Guard Premium",
+        provider: "ICICI Lombard",
+        coverageType: "Home",
+        premiumAmount: 15000,
+        coverageAmount: 1000000,
+        features: ["Fire and natural calamity coverage", "Burglary and theft protection", "Earthquake coverage included", "Temporary accommodation expenses"],
+        ageGroup: "All ages",
+        originalPrice: 15000,
+        discount: 0,
+        finalPrice: 15000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    },
+    {
+        planName: "Travel Safe International",
+        provider: "Tata AIG",
+        coverageType: "Travel",
+        premiumAmount: 5000,
+        coverageAmount: 200000,
+        features: ["Medical emergency coverage abroad", "Lost baggage protection", "Flight delay compensation", "COVID-19 coverage included"],
+        ageGroup: "All ages",
+        originalPrice: 5000,
+        discount: 0,
+        finalPrice: 5000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    },
+    {
+        planName: "Business Protect Suite",
+        provider: "Reliance General",
+        coverageType: "Business",
+        premiumAmount: 35000,
+        coverageAmount: 5000000,
+        features: ["Property damage coverage", "Public liability protection", "Business interruption insurance", "Employee accident coverage"],
+        ageGroup: "Business owners",
+        originalPrice: 35000,
+        discount: 0,
+        finalPrice: 35000,
+        discountBreakdown: {
+            badgeDiscount: 0,
+            creditDiscount: 0,
+            totalBadges: 0,
+            totalCredits: 0
+        }
+    }
+];
 
 export default function InsuranceScreen({ navigation }) {
     const [insurancePlans, setInsurancePlans] = useState([]);
@@ -26,8 +137,11 @@ export default function InsuranceScreen({ navigation }) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState(null);
+    const [dataSource, setDataSource] = useState("server"); // "server", "fallback", or "offline"
+    const [retryAttempts, setRetryAttempts] = useState(0);
 
     const BASE_URL = "http://10.231.48.49:3000"; // Update this to your server IP
+    const MAX_RETRY_ATTEMPTS = 2;
 
     useEffect(() => {
         fetchInsurancePlans();
@@ -37,43 +151,113 @@ export default function InsuranceScreen({ navigation }) {
     const fetchUserRewards = async () => {
         try {
             const token = await AsyncStorage.getItem("token");
+            if (!token) {
+                console.log("No token found, using default rewards");
+                return;
+            }
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
             const response = await fetch(`${BASE_URL}/api/insurance/rewards`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
+
             const data = await response.json();
             if (response.ok) {
                 setUserRewards({
-                    credits: data.credits,
-                    badges: data.badges.length,
-                    badgesList: data.badges
+                    credits: data.credits || 0,
+                    badges: data.badges?.length || 0,
+                    badgesList: data.badges || []
                 });
             }
         } catch (error) {
             console.error("Error fetching rewards:", error);
+            // Keep existing rewards or use defaults
+            if (error.name === 'AbortError') {
+                console.log("Request timeout - using existing rewards");
+            }
         }
     };
 
-    const fetchInsurancePlans = async () => {
+    const fetchInsurancePlans = async (isRetry = false) => {
         try {
             setLoading(true);
             setError(null);
+
             const token = await AsyncStorage.getItem("token");
+            if (!token) {
+                throw new Error("Authentication required");
+            }
+
+            // Set timeout for fetch request
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
             const response = await fetch(`${BASE_URL}/api/insurance/plans`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             const data = await response.json();
 
             if (response.ok) {
-                setInsurancePlans(data.plans);
-                setUserRewards(data.userRewards);
+                if (data.plans && data.plans.length > 0) {
+                    setInsurancePlans(data.plans);
+                    setUserRewards(data.userRewards || { credits: 0, badges: 0, badgesList: [] });
+                    setDataSource(data.dataSource || "server");
+                    setRetryAttempts(0);
+                } else {
+                    // Server returned empty plans, use fallback
+                    throw new Error("No plans available from server");
+                }
             } else {
-                setError(data.error || "Failed to fetch insurance plans");
+                throw new Error(data.error || "Failed to fetch insurance plans");
             }
         } catch (error) {
-            setError("Network error. Please check your connection.");
             console.error("Error fetching insurance plans:", error);
+
+            // Handle different error types
+            let errorMessage = "Unable to connect to server";
+            let shouldUseFallback = true;
+
+            if (error.name === 'AbortError') {
+                errorMessage = "Request timeout. Using cached plans.";
+            } else if (error.message === "Authentication required") {
+                errorMessage = "Please log in again";
+                shouldUseFallback = false;
+            } else if (error.message.includes("Network request failed")) {
+                errorMessage = "No internet connection. Showing offline plans.";
+            }
+
+            setError(errorMessage);
+
+            // Use fallback plans
+            if (shouldUseFallback) {
+                if (retryAttempts < MAX_RETRY_ATTEMPTS && !isRetry) {
+                    // Auto-retry once
+                    console.log(`Auto-retry attempt ${retryAttempts + 1}/${MAX_RETRY_ATTEMPTS}`);
+                    setRetryAttempts(prev => prev + 1);
+                    setTimeout(() => fetchInsurancePlans(true), 2000);
+                } else {
+                    // Use fallback plans
+                    console.log("Using fallback insurance plans");
+                    setInsurancePlans(FALLBACK_INSURANCE_PLANS);
+                    setDataSource("offline");
+
+                    // Show info alert
+                    Alert.alert(
+                        "Offline Mode",
+                        "Showing sample insurance plans. Connect to internet for personalized plans with your rewards.",
+                        [{ text: "OK" }]
+                    );
+                }
+            }
         } finally {
             setLoading(false);
         }
@@ -81,25 +265,42 @@ export default function InsuranceScreen({ navigation }) {
 
     const onRefresh = async () => {
         setRefreshing(true);
+        setRetryAttempts(0); // Reset retry attempts on manual refresh
         await fetchInsurancePlans();
+        await fetchUserRewards();
         setRefreshing(false);
     };
 
     const addSampleRewards = async () => {
         try {
             const token = await AsyncStorage.getItem("token");
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             const response = await fetch(`${BASE_URL}/api/insurance/rewards/sample`, {
                 method: "POST",
-                headers: { Authorization: `Bearer ${token}` }
+                headers: { Authorization: `Bearer ${token}` },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (response.ok) {
                 Alert.alert("Success", "Sample rewards added! Pull down to refresh.");
                 await fetchUserRewards();
                 await fetchInsurancePlans();
+            } else {
+                throw new Error("Failed to add rewards");
             }
         } catch (error) {
-            Alert.alert("Error", "Failed to add sample rewards");
+            console.error("Error adding sample rewards:", error);
+            Alert.alert(
+                "Error",
+                error.name === 'AbortError'
+                    ? "Request timeout. Please try again."
+                    : "Failed to add sample rewards. Check your connection."
+            );
         }
     };
 
@@ -132,6 +333,9 @@ export default function InsuranceScreen({ navigation }) {
             <View style={styles.centerContainer}>
                 <ActivityIndicator size="large" color="#2196F3" />
                 <Text style={styles.loadingText}>Fetching insurance plans...</Text>
+                {retryAttempts > 0 && (
+                    <Text style={styles.retryText}>Retry attempt {retryAttempts}/{MAX_RETRY_ATTEMPTS}</Text>
+                )}
             </View>
         );
     }
@@ -159,12 +363,33 @@ export default function InsuranceScreen({ navigation }) {
                 </TouchableOpacity>
             </View>
 
+            {/* Data Source Indicator */}
+            {dataSource !== "server" && insurancePlans.length > 0 && (
+                <Card style={styles.offlineCard} elevation={2}>
+                    <Card.Content>
+                        <View style={styles.offlineContent}>
+                            <MaterialIcons name="cloud-off" size={20} color="#FF9800" />
+                            <Text style={styles.offlineText}>
+                                {dataSource === "offline"
+                                    ? "Offline Mode - Showing sample plans"
+                                    : "Using cached data"}
+                            </Text>
+                        </View>
+                    </Card.Content>
+                </Card>
+            )}
+
             {/* Rewards Summary */}
             <Card style={styles.rewardsCard} elevation={4}>
                 <Card.Content>
                     <View style={styles.rewardsHeader}>
                         <MaterialIcons name="stars" size={24} color="#FFD700" />
                         <Text style={styles.rewardsTitle}>Your Rewards</Text>
+                        {dataSource === "offline" && (
+                            <Chip style={styles.offlineChip} textStyle={styles.offlineChipText}>
+                                Offline
+                            </Chip>
+                        )}
                     </View>
                     <Divider style={styles.divider} />
 
@@ -199,27 +424,36 @@ export default function InsuranceScreen({ navigation }) {
                         </View>
                     )}
 
-                    <Button
-                        mode="outlined"
-                        onPress={addSampleRewards}
-                        style={styles.sampleButton}
-                        labelStyle={styles.sampleButtonText}
-                    >
-                        Add Sample Rewards (Testing)
-                    </Button>
+                    {dataSource === "server" && (
+                        <Button
+                            mode="outlined"
+                            onPress={addSampleRewards}
+                            style={styles.sampleButton}
+                            labelStyle={styles.sampleButtonText}
+                        >
+                            Add Sample Rewards (Testing)
+                        </Button>
+                    )}
                 </Card.Content>
             </Card>
 
             {/* Error Handling */}
-            {error && (
+            {error && dataSource !== "offline" && (
                 <Card style={styles.errorCard} elevation={2}>
                     <Card.Content>
                         <View style={styles.errorContent}>
                             <MaterialIcons name="error" size={24} color="#F44336" />
                             <Text style={styles.errorText}>{error}</Text>
                         </View>
-                        <Button mode="contained" onPress={fetchInsurancePlans} style={styles.retryButton}>
-                            Retry
+                        <Button
+                            mode="contained"
+                            onPress={() => {
+                                setRetryAttempts(0);
+                                fetchInsurancePlans();
+                            }}
+                            style={styles.retryButton}
+                        >
+                            Retry Connection
                         </Button>
                     </Card.Content>
                 </Card>
@@ -228,7 +462,9 @@ export default function InsuranceScreen({ navigation }) {
             {/* Insurance Plans */}
             {insurancePlans.length > 0 ? (
                 <View style={styles.plansContainer}>
-                    <Text style={styles.sectionTitle}>Available Insurance Plans</Text>
+                    <Text style={styles.sectionTitle}>
+                        {dataSource === "offline" ? "Sample Insurance Plans" : "Available Insurance Plans"}
+                    </Text>
                     {insurancePlans.map((plan, index) => (
                         <Card key={index} style={styles.planCard} elevation={3}>
                             <Card.Content>
@@ -273,7 +509,7 @@ export default function InsuranceScreen({ navigation }) {
                                 </View>
 
                                 {/* Discount Breakdown */}
-                                {plan.discount > 0 && (
+                                {plan.discount > 0 && plan.discountBreakdown && (
                                     <View style={styles.discountBreakdown}>
                                         <Text style={styles.discountTitle}>Your Savings Breakdown:</Text>
                                         {plan.discountBreakdown.badgeDiscount > 0 && (
@@ -311,9 +547,22 @@ export default function InsuranceScreen({ navigation }) {
                                 <Button
                                     mode="contained"
                                     style={[styles.selectButton, { backgroundColor: getCoverageColor(plan.coverageType) }]}
-                                    onPress={() => Alert.alert("Plan Selected", `You selected ${plan.planName}`)}
+                                    onPress={() => {
+                                        if (dataSource === "offline") {
+                                            Alert.alert(
+                                                "Offline Mode",
+                                                "Connect to internet to select and purchase insurance plans.",
+                                                [
+                                                    { text: "Cancel", style: "cancel" },
+                                                    { text: "Retry", onPress: onRefresh }
+                                                ]
+                                            );
+                                        } else {
+                                            Alert.alert("Plan Selected", `You selected ${plan.planName}`);
+                                        }
+                                    }}
                                 >
-                                    Select This Plan
+                                    {dataSource === "offline" ? "View Details (Offline)" : "Select This Plan"}
                                 </Button>
                             </Card.Content>
                         </Card>
@@ -350,6 +599,11 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: "#666",
     },
+    retryText: {
+        marginTop: 8,
+        fontSize: 14,
+        color: "#999",
+    },
     header: {
         flexDirection: "row",
         alignItems: "center",
@@ -370,6 +624,22 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#333",
     },
+    offlineCard: {
+        marginHorizontal: 16,
+        marginBottom: 8,
+        borderRadius: 8,
+        backgroundColor: "#FFF3E0",
+    },
+    offlineContent: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    offlineText: {
+        marginLeft: 8,
+        fontSize: 14,
+        color: "#E65100",
+        fontWeight: "500",
+    },
     rewardsCard: {
         margin: 16,
         marginBottom: 8,
@@ -386,6 +656,15 @@ const styles = StyleSheet.create({
         fontWeight: "600",
         color: "#333",
         marginLeft: 8,
+        flex: 1,
+    },
+    offlineChip: {
+        backgroundColor: "#FFE0B2",
+        height: 24,
+    },
+    offlineChipText: {
+        fontSize: 10,
+        color: "#E65100",
     },
     divider: {
         marginVertical: 12,
