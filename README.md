@@ -59,8 +59,6 @@ npx expo start
 ```
 This will start Expo. You can scan the QR code with the Expo Go app to run it on your phone.
 ## 📱 Screenshots
-
-Here are some screenshots of the application:
 <img width="289" height="616" alt="image" src="https://github.com/user-attachments/assets/3f80b637-6614-4bbc-aa9a-17d0e5a0b120" />
 <img width="289" height="616" alt="image" src="https://github.com/user-attachments/assets/38f4cb25-670f-405f-b92d-5e1775cf8415" />
 <img width="289" height="616" alt="image" src="https://github.com/user-attachments/assets/6123ca87-0ef3-4525-b8bd-85ebd4620a97" />
