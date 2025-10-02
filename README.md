@@ -1,4 +1,4 @@
-# YouMatter Gamified Wellness App
+# Gamified Wellness App
 
 ## 📌 Overview  
 This project is a **gamified wellness application** built using **Expo + React Native** for the frontend and **Node.js + Express + MongoDB** for the backend.  
